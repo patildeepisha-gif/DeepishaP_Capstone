@@ -45,5 +45,18 @@ WHERE
         WHERE customer_id IS NOT NULL
     );
 
+query 4
+GROUP BY + HAVING — city-wise return rate
+SELECT
+    c.city,
+    COUNT(*) AS total_orders,
+    SUM(o.returned) AS returned_orders,
+    ROUND(SUM(o.returned) * 100.0 / COUNT(*), 1) AS return_rate_pct
+FROM orders o
+JOIN customers c
+    ON o.customer_id = c.customer_id
+GROUP BY c.city
+HAVING ROUND(SUM(o.returned) * 100.0 / COUNT(*), 1) > 20
+ORDER BY return_rate_pct DESC;
 
 
