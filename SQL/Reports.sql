@@ -59,4 +59,90 @@ GROUP BY c.city
 HAVING ROUND(SUM(o.returned) * 100.0 / COUNT(*), 1) > 20
 ORDER BY return_rate_pct DESC;
 
+Query 5
+SELECT
+    c.customer_id,
+    c.name,
+    ROUND(
+        SUM(
+            p.price * o.quantity *
+            (1 - COALESCE(o.discount_pct, 0) / 100.0)
+        ),
+        2
+    ) AS total_spend
+FROM orders o
+JOIN products p
+    ON o.product_id = p.product_id
+JOIN customers c
+    ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.name
+-- customer_id breaks ties so the ranking order is deterministic.
+ORDER BY total_spend DESC, c.customer_id ASC
+LIMIT 5;
+
+SELECT
+    c.customer_id,
+    c.name,
+    ROUND(
+        SUM(
+            p.price * o.quantity *
+            (1 - COALESCE(o.discount_pct, 0) / 100.0)
+        ),
+        2
+    ) AS total_spend
+FROM orders o
+JOIN products p
+    ON o.product_id = p.product_id
+JOIN customers c
+    ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.name
+-- customer_id breaks ties so the ranking order is deterministic.
+ORDER BY total_spend DESC, c.customer_id ASC
+LIMIT 3 offset 2;
+
+Query 6
+ELECT
+    p.category,
+    COUNT(*) AS order_count,
+    ROUND(
+        SUM(
+            p.price * o.quantity *
+            (1 - COALESCE(o.discount_pct, 0) / 100.0)
+        ),
+        2
+    ) AS category_revenue
+FROM orders o
+JOIN products p
+    ON o.product_id = p.product_id
+JOIN customers c
+    ON o.customer_id = c.customer_id
+GROUP BY p.category
+ORDER BY category_revenue DESC;
+
+Query 7
+SELECT *
+FROM customers
+WHERE name LIKE 'A%';
+
+Query 8
+SELECT DISTINCT acquisition_source
+FROM customers
+ORDER BY acquisition_source;
+
+Query 9
+ALTER TABLE customers
+ADD COLUMN loyalty_tier VARCHAR(10)
+
+UPDATE customers
+SET loyalty_tier =
+    CASE
+        WHEN city_tier = 1 THEN 'Gold'
+        ELSE 'Silver'
+    END;
+    
+    SELECT
+    loyalty_tier,
+    COUNT(*) AS customer_count
+FROM customers
+GROUP BY loyalty_tier;
 
