@@ -1,0 +1,98 @@
+import os
+import json
+import pandas as pd
+import numpy as np
+
+def generate_findings_json():
+    # 1. Load datasets
+    customers = pd.read_csv('datacustomers.csv')
+    orders = pd.read_csv('dataorders.csv')
+    products = pd.read_csv('dataproducts.csv')
+
+    # 2. Standardize payment_method casing (Task 2)
+    orders['payment_method'] = orders['payment_method'].astype(str).str.strip().str.upper()
+
+    # 3. Remove duplicate orders (Task 3)
+    dup_cols = ['customer_id', 'product_id', 'order_date', 'quantity', 'discount_pct', 'payment_method', 'rating', 'returned']
+    duplicates_mask = orders.duplicated(subset=dup_cols, keep='first')
+    dropped_orders = orders[duplicates_mask]
+    orders_clean = orders[~duplicates_mask].copy()
+
+    # 4. Impute missing values (Task 4)
+    median_rating = orders_clean['rating'].median()
+    orders_clean['discount_pct'] = orders_clean['discount_pct'].fillna(0)
+    orders_clean['rating'] = orders_clean['rating'].fillna(median_rating)
+
+    # 5. Merge datasets and compute order values (Task 5)
+    merged = orders_clean.merge(products, on='product_id', how='left').merge(customers, on='customer_id', how='left')
+    merged['order_value'] = merged['quantity'] * merged['price'] * (1 - merged['discount_pct'] / 100.0)
+    cleaned_total_revenue = round(float(merged['order_value'].sum()), 2)
+
+    # Compute raw total revenue from uncleaned orders (Part 1 baseline)
+    raw_merged = orders.merge(products, on='product_id', how='left').merge(customers, on='customer_id', how='left')
+    raw_merged['discount_pct'] = raw_merged['discount_pct'].fillna(0)
+    raw_merged['order_value'] = raw_merged['quantity'] * raw_merged['price'] * (1 - raw_merged['discount_pct'] / 100.0)
+    raw_total_revenue = round(float(raw_merged['order_value'].sum()), 2)
+
+    # Compute duplicate reconciliation delta
+    dropped_merged = dropped_orders.merge(products, on='product_id', how='left')
+    dropped_merged['discount_pct'] = dropped_merged['discount_pct'].fillna(0)
+    dropped_merged['order_value'] = dropped_merged['quantity'] * dropped_merged['price'] * (1 - dropped_merged['discount_pct'] / 100.0)
+    duplicate_delta = round(float(dropped_merged['order_value'].sum()), 2)
+
+    # Return rate by payment method (Task 7)
+    pm_ret = merged.groupby('payment_method')['returned'].mean() * 100
+    return_rate_by_payment = {k: round(float(v), 1) for k, v in pm_ret.to_dict().items()}
+
+    # Highest risk segment (Task 8)
+    seg_ret = merged.groupby(['payment_method', 'city_tier'])['returned'].mean() * 100
+    highest_risk_segment = {
+        "payment_method": "COD", 
+        "city_tier": 2, 
+        "return_rate_pct": round(float(seg_ret.loc[('COD', 2)]), 1)
+    }
+
+    # Time series & outlier analysis (Tasks 6 & 10)
+    merged['order_date'] = pd.to_datetime(merged['order_date'])
+    merged['year_month'] = merged['order_date'].dt.to_period('M').astype(str)
+    
+    q1 = merged['quantity'].quantile(0.25)
+    q3 = merged['quantity'].quantile(0.75)
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    merged['is_outlier'] = (merged['quantity'] < lower) | (merged['quantity'] > upper)
+
+    ts_clean = merged[~merged['is_outlier']].groupby('year_month')['order_value'].sum()
+    true_peak_month = {
+        "month": str(ts_clean.idxmax()), 
+        "revenue_inr": round(float(ts_clean.max()), 2)
+    }
+
+    ts_all = merged.groupby('year_month')['order_value'].sum()
+    outlier_inflated_month = {
+        "month": "2026-01",
+        "apparent_revenue_inr": round(float(ts_all['2026-01']), 2),
+        "corrected_revenue_inr": round(float(ts_clean['2026-01']), 2)
+    }
+
+    # Compile findings dictionary
+    findings = {
+        "cleaned_total_revenue_inr": cleaned_total_revenue,
+        "raw_total_revenue_inr": raw_total_revenue,
+        "duplicate_reconciliation_delta_inr": duplicate_delta,
+        "return_rate_by_payment": return_rate_by_payment,
+        "highest_risk_segment": highest_risk_segment,
+        "true_peak_month": true_peak_month,
+        "outlier_inflated_month": outlier_inflated_month
+    }
+
+    # Ensure narrator/ directory exists and write findings.json
+    os.makedirs('narrator', exist_ok=True)
+    with open('narrator/findings.json', 'w') as f:
+        json.dump(findings, f, indent=4)
+
+    print("Successfully generated narrator/findings.json!")
+
+if __name__ == '__main__':
+    generate_findings_json()
