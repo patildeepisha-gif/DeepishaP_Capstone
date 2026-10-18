@@ -5,9 +5,9 @@ import numpy as np
 
 def generate_findings_json():
     # 1. Load datasets
-    customers = pd.read_csv('datacustomers.csv')
-    orders = pd.read_csv('dataorders.csv')
-    products = pd.read_csv('dataproducts.csv')
+    customers = pd.read_csv('customers.csv')
+    orders = pd.read_csv('orders.csv')
+    products = pd.read_csv('products.csv')
 
     # 2. Standardize payment_method casing (Task 2)
     orders['payment_method'] = orders['payment_method'].astype(str).str.strip().str.upper()
