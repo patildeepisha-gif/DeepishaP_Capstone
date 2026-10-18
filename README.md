@@ -162,9 +162,9 @@ the same inputs.
 
 ``` text
 .
-├── datacustomers.csv
-├── dataorders.csv
-├── dataproducts.csv
+├── customers.csv
+├── orders.csv
+├── products.csv
 ├── db.sqlite                 # Created by the SQL commands above
 ├── sql/
 │   ├── schema.sql
